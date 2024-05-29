@@ -1,7 +1,25 @@
 """
 <plugin key="DevmelAirSend" name="Devmel AirSend" author="ping" version="0.1.0">
 	<description>
-Devmel AirSend plugin.<br/><br/>
+		<h2>Devmel AirSend plugin</h2><br/>
+		<h3>Parameters</h3>
+		<ul style="list-style-type:square">
+			<li>Address: Webserver IP address (default: 127.0.0.1)</li>
+			<li>Port: Webserver IP port (default: 33863). Probably useless since as far as I know, it can't be changed so it has to be 33863</li>
+			<li>Spurl: Identification to the Airsend module in the form sp://password@ipv4. I don't know why but using ipv6 doesn't seems to work (even when using curl in command line)</li>
+			<li>Devices Config: A JSON export of the device configuration.<br/>
+				For example:<br/>
+				<pre><code>{<br/>
+    "devices":[<br/>
+        {"name":"Blind1","localip":"xxxx::xxxx:xxxx:xxxx:xxxx","type":"4098","pid":"13920","addr":"1234567"},<br/>
+        {"name":"Blind2","localip":"xxxx::xxxx:xxxx:xxxx:xxxx","type":"4098","pid":"26848","addr":"7654321"},<br/>
+        {"name":"Screen Stop","localip":"xxxx::xxxx:xxxx:xxxx:xxxx","type":"4096","opt":"18","pid":"801","addr":"01234"},<br/>
+        {"name":"Screen Up","localip":"xxxx::xxxx:xxxx:xxxx:xxxx","type":"4096","opt":"17","pid":"801","addr":"01234"},<br/>
+        {"name":"Screen Down","localip":"xxxx::xxxx:xxxx:xxxx:xxxx","type":"4096","opt":"20","pid":"801","addr":"01234"}<br/>
+    ]<br/>
+}</code></pre>
+			</li>
+		</ul>
 	</description>
 	<params>
 		<param field="Address" label="WebServer Address" width="300px" required="true" default="127.0.0.1"/>
