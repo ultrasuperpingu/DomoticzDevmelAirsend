@@ -51,10 +51,7 @@ class BasePlugin:
 
 
 	def onStart(self):
-		#if Parameters["Mode6"] != "0":
-		#	DumpConfigToLog()
-		#	Domoticz.Debugging(int(Parameters["Mode6"]))
-		#Domoticz.Heartbeat(int(Parameters["Mode1"]))
+		DumpConfigToLog()
 		self._spurl=Parameters["Mode1"]
 		self._serviceurl=Parameters["Address"]+":"+Parameters["Port"]
 		devicesSpecs=json.loads(Parameters["Mode2"])
@@ -74,16 +71,6 @@ class BasePlugin:
 				TypeCfg=BlindPositionCfg
 			CreateDeviceIfNeeded(name, pid+"_"+addr+"_"+str(opt), TypeCfg)
 
-	def onConnect(self, Connection, Status, Description):
-		pass
-
-	def onMessage(self, Connection, Data):
-		Domoticz.Debug("onMessage called for connection: '"+Connection.Name+"'")
-
-	def onHeartbeat(self):
-		Domoticz.Debug("Heartbeating...")
-		
-	# Called when a command is sent to one device linked to this plug-in
 	def onCommand(self, Unit, Command, Level, sColor):
 		device = Devices[Unit]
 		Domoticz.Log(f"{device.Name}, {device.DeviceID}: Command: '{Command}', Level: {Level}, Color: {sColor}")
@@ -95,27 +82,24 @@ class BasePlugin:
 			opt=int(fields[2])
 		
 		if opt:
-			self.command(pid, addr, opt)
+			self.commandState(pid, addr, opt)
 		elif Command == "Open":
-			self.command(pid, addr, "UP")
+			self.commandState(pid, addr, "UP")
 		elif Command == "Stop":
-			self.command(pid, addr, "STOP")
+			self.commandState(pid, addr, "STOP")
 		elif Command == "Close":
-			self.command(pid, addr, "DOWN")
+			self.commandState(pid, addr, "DOWN")
+		elif Command == "Set Level":
+			self.commandState(pid, addr, int(Level))
 
-	# Called when a device is added to this plug-in
 	def onDeviceAdded(self, Unit):
 		device = Devices[Unit]
 		Domoticz.Log(f"onDeviceAdded {device.Name}")
 
-	# Called when a device managed by this plug-in is (externally) modified
-	# This is the case when callback is called by AirSend web service
-	# One message will be received for each event (they're split by callback)
 	def onDeviceModified(self, Unit):
 		device = Devices[Unit]
 		Domoticz.Log(f"onDeviceModified {device.Name}")
 
-	# Called when a device is removed from this plug-in
 	def onDeviceRemoved(self, Unit):
 		device = Devices[Unit]
 		Domoticz.Log(f"onDeviceRemoved {device.Name}")
@@ -143,46 +127,46 @@ class BasePlugin:
 				pass
 		return ret
 
-	def command(self, pid, addr, command):
-		self.transfert(pid, addr, {"method":"PUT","type":"STATE","value":command})
+	def commandState(self, pid, addr, command):
+		self.transfer(pid, addr, {"method":"PUT","type":"STATE","value":command})
+	def commandLevel(self, pid, addr, command):
+		self.transfer(pid, addr, {"method":"PUT","type":"LEVEL","value":command})
 
-	def transfert(self, pid, addr, note, entity_id = 12345) -> bool:
+	def transfer(self, pid, addr, note) -> bool:
 		"""Send a command."""
 		status_code = 404
 		ret = False
+
+		#uid = hashlib.sha256(entity_id.encode('utf-8')).hexdigest()[:12]
+		jnote = json.dumps(note)
 		
-		if self._serviceurl and self._spurl and entity_id is not None:
-			#uid = hashlib.sha256(entity_id.encode('utf-8')).hexdigest()[:12]
-			uid="12345"
-			jnote = json.dumps(note)
-			
-			payload = (
-				'{"wait": 0, "channel":{ "id":'
-				+ str(pid) +', "source\":'+str(addr)
-				+ '}, "thingnotes":{"uid":"0x'+uid+'", "notes":['
-				+ jnote
-				+ "]}}"
+		payload = (
+			'{"wait": 0, "channel":{ "id":'
+			+ str(pid) +', "source\":'+str(addr)
+			+ '}, "thingnotes":{"uid":"12345", "notes":['
+			+ jnote
+			+ "]}}"
+		)
+		headers = {
+			"Authorization": "Bearer " + self._spurl,
+			"content-type": "application/json",
+			"User-Agent": "domo_airsend",
+		}
+		try:
+			response = post("http://"+
+				self._serviceurl + "/airsend/transfer",
+				headers=headers,
+				data=payload,
+				timeout=6,
 			)
-			headers = {
-				"Authorization": "Bearer " + self._spurl,
-				"content-type": "application/json",
-				"User-Agent": "domo_airsend",
-			}
-			try:
-				response = post("http://"+
-					self._serviceurl + "/airsend/transfer",
-					headers=headers,
-					data=payload,
-					timeout=6,
-				)
-				ret = None
-				status_code = response.status_code
-			except exceptions.RequestException:
-				pass
+			ret = None
+			status_code = response.status_code
+		except exceptions.RequestException:
+			pass
 		if status_code == 200:
 			return ret
 		Domoticz.Error("Transfer error "+"http://"+self._serviceurl + "/airsend/transfer: error code="+ str(status_code)+", "+payload)
-
+		return ret
 
 global _plugin
 _plugin = BasePlugin()
@@ -190,18 +174,6 @@ _plugin = BasePlugin()
 def onStart():
 	global _plugin
 	_plugin.onStart()
-
-def onConnect(Connection, Status, Description):
-	global _plugin
-	_plugin.onConnect(Connection, Status, Description)
-
-def onMessage(Connection, Data):
-	global _plugin
-	_plugin.onMessage(Connection, Data)
-
-def onHeartbeat():
-	global _plugin
-	_plugin.onHeartbeat()
 
 def onCommand(Unit, Command, Level, Color):
 	global _plugin
@@ -220,4 +192,3 @@ def DumpConfigToLog():
 		if Parameters[x] != "":
 			Domoticz.Log( "'" + x + "':'" + str(Parameters[x]) + "'")
 	return
-
