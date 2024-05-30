@@ -1,8 +1,7 @@
 # DomoticzDevmelAirsend
 Devmel Airsend Plugin for Domoticz
 ## Parameters
- * Address: Webserver IP address (default: 127.0.0.1)
- * Port: Webserver IP port (default: 33863). Probably useless since as far as I know, it can't be changed so it has to be 33863
+ * Callback Port: Plugin Http Server port where the Webserver will send the callbacks (default: 8078).
  * Spurl: Identification to the Airsend module in the form sp://password@ipv4. I don't know why but using ipv6 doesn't seems to work (even when using curl in command line)
  * Devices Config: A JSON export of the device configuration (localip field is ignored).
 				For example:
