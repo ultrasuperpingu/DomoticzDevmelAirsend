@@ -4,8 +4,6 @@
 		<h2>Devmel AirSend plugin</h2><br/>
 		<h3>Parameters</h3>
 		<ul style="list-style-type:square">
-			<li>Address: Webserver IP address (default: 127.0.0.1)</li>
-			<li>Port: Webserver IP port (default: 33863). Probably useless since as far as I know, it can't be changed so it has to be 33863</li>
 			<li>Spurl: Identification to the Airsend module in the form sp://password@ipv4. I don't know why but using ipv6 doesn't seems to work (even when using curl in command line)</li>
 			<li>Devices Config: A JSON export of the device configuration.<br/>
 				For example:<br/>
@@ -22,8 +20,7 @@
 		</ul>
 	</description>
 	<params>
-		<param field="Address" label="WebServer Address" width="300px" required="true" default="127.0.0.1"/>
-		<param field="Port" label="WebServer Port" width="300px" required="true" default="33863"/>
+		<param field="Port" label="Callback Port" width="30px" required="true" default="8078"/>
 		<param field="Mode1" label="Spurl" width="400px" required="true" default="sp://xxxxxxxxxxxxxxxx@xxx.xxx.xxx.xxx"/>
 		<param field="Mode2" label="Devices Config" width="400px" rows="10" default=""/>
 	</params>
@@ -57,7 +54,6 @@ def CreateDeviceIfNeeded(Name, DeviceID, DeviceFullType):
 	return dev
 
 class BasePlugin:
-	# Return a path in a dictionary or default value if not existing
 	def getPathValue (self, dict, path, separator = '/', default=None):
 		pathElements = path.split(separator)
 		element = dict
@@ -71,7 +67,12 @@ class BasePlugin:
 	def onStart(self):
 		DumpConfigToLog()
 		self._spurl=Parameters["Mode1"]
-		self._serviceurl=Parameters["Address"]+":"+Parameters["Port"]
+		self._callbackAddr="http://127.0.0.1:"+Parameters["Port"]
+		self._transferId=1
+		self._requestCallbacks={}
+		self.httpServerConns = {}
+		self.httpServerConn = Domoticz.Connection(Name="Server Connection", Transport="TCP/IP", Protocol="HTTP", Port=Parameters["Port"])
+		self.httpServerConn.Listen()
 		devicesSpecs=json.loads(Parameters["Mode2"])
 		for dev in self.getPathValue(devicesSpecs,"devices"):
 			name=self.getPathValue(dev,"name")
@@ -88,6 +89,11 @@ class BasePlugin:
 			elif typ=="4099":
 				TypeCfg=BlindPositionCfg
 			CreateDeviceIfNeeded(name, pid+"_"+addr+"_"+str(opt), TypeCfg)
+		self.bind(callbackAddr=self._callbackAddr)
+
+	def onStop(self):
+		Domoticz.Status("Stopping...")
+		self.close()
 
 	def onCommand(self, Unit, Command, Level, sColor):
 		device = Devices[Unit]
@@ -102,31 +108,73 @@ class BasePlugin:
 		if opt:
 			self.commandState(pid, addr, opt)
 		elif Command == "Open":
-			self.commandState(pid, addr, "UP")
+			self.commandState(pid, addr, "UP", lambda: device.Update(nValue=1, sValue = str("100")))
 		elif Command == "Stop":
-			self.commandState(pid, addr, "STOP")
+			self.commandState(pid, addr, "STOP", lambda: device.Update(nValue=17, sValue = device.sValue))
+			
 		elif Command == "Close":
-			self.commandState(pid, addr, "DOWN")
+			self.commandState(pid, addr, "DOWN", lambda: device.Update(nValue=0, sValue = str("0")))
+		elif Command == "On":
+			self.commandState(pid, addr, "ON", lambda: device.Update(nValue=1, sValue = str("1")))
+		elif Command == "Off":
+			self.commandState(pid, addr, "OFF", lambda: device.Update(nValue=0, sValue = str("0")))
 		elif Command == "Set Level":
-			self.commandState(pid, addr, int(Level))
+			self.commandState(pid, addr, int(Level), lambda: device.Update(nValue=17, sValue = str(Level)))
+		else:
+			Domoticz.Error("Unknown command "+Command+" requested on device " + device.Name)
 
 	def onDeviceAdded(self, Unit):
 		device = Devices[Unit]
-		Domoticz.Log(f"onDeviceAdded {device.Name}")
+		Domoticz.Status(f"Device Added {device.Name}")
 
 	def onDeviceModified(self, Unit):
 		device = Devices[Unit]
-		Domoticz.Log(f"onDeviceModified {device.Name}")
+		Domoticz.Status(f"Device Modified {device.Name}")
 
 	def onDeviceRemoved(self, Unit):
 		device = Devices[Unit]
-		Domoticz.Log(f"onDeviceRemoved {device.Name}")
+		Domoticz.Status(f"Device Removed {device.Name}")
 
-	def bind(self, bind = None) -> bool:
+	def onConnect(self, Connection, Status, Description):
+		if (Status == 0):
+			Domoticz.Log(f"Connected successfully to: {Connection.Address}:{Connection.Port}")
+		else:
+			Domoticz.Error(f"Failed to connect ({str(Status)} to: {Connection.Address}:{Connection.Port} with error: {Description}")
+		self.httpServerConns[Connection.Name] = Connection
+
+	def onMessage(self, Connection, Data):
+		#Domoticz.Log("Received: " + str(Data));
+		resp = {"Status":"200 OK", "Headers": {"Accept": "Content-Type: text/html; charset=UTF-8"}, "Data": "OK"}
+		Connection.Send(resp)
+		if 'User-Agent' in Data['Headers'] and Data['Headers']['User-Agent'] == "AirSendWebService Callback":
+			data = json.loads(Data['Data'])
+			if 'events' in data:
+				for e in data['events']:
+					
+					if 'thingnotes' in e and 'uid' in e['thingnotes']:
+						uid=e['thingnotes']['uid']
+						if uid in self._requestCallbacks:
+							Domoticz.Log(self._requestCallbacks[uid])
+							self._requestCallbacks[uid]()
+							del self._requestCallbacks[uid]
+
+	def onDisconnect(self, Connection):
+		Domoticz.Log(f"onDisconnect called for connection '{Connection.Name}'.")
+		if Connection.Name in self.httpServerConns:
+			Domoticz.Log("deleting connection '" + Connection.Name + "'.")
+			del self.httpServerConns[Connection.Name]
+
+	def bind(self, callbackAddr=None, channel = None) -> bool:
 		"""Bind a channel to listen."""
 		ret = False
-		if self._serviceurl and self._spurl and type(bind) is int and bind > 0:
-			payload = ('{"channel":{"id": '+str(bind)+'},\"duration\":0,\"callback\":\"http://127.0.0.1/\"}')
+		if self._spurl:
+			callbackStr = ''
+			if callbackAddr:
+				callbackStr=', "callback": "'+callbackAddr+'"'
+			channel = ''
+			if type(channel) is int and channel > 0:
+				channel = '"channel":{"id": '+str(channel)+'},'
+			payload = ('{'+channel+'"duration":0'+callbackStr+'}')
 			headers = {
 				"Authorization": "Bearer " + self._spurl,
 				"content-type": "application/json",
@@ -134,7 +182,7 @@ class BasePlugin:
 			}
 			try:
 				response = post(
-					self._serviceurl + "airsend/bind",
+					"http://127.0.0.1:33863/airsend/bind",
 					headers=headers,
 					data=payload,
 					timeout=6,
@@ -142,37 +190,66 @@ class BasePlugin:
 				if response.status_code == 200:
 					ret = True
 			except exceptions.RequestException:
+				Domoticz.Error("Error binding listening: error code: "+response.status_code);
 				pass
 		return ret
 
-	def commandState(self, pid, addr, command):
-		self.transfer(pid, addr, {"method":"PUT","type":"STATE","value":command})
-	def commandLevel(self, pid, addr, command):
-		self.transfer(pid, addr, {"method":"PUT","type":"LEVEL","value":command})
+	def close(self) -> bool:
+		"""Close listening."""
+		ret = False
+		if self._spurl:
+			headers = {
+				"Authorization": "Bearer " + self._spurl,
+				"content-type": "application/json",
+				"User-Agent": "domo_airsend",
+			}
+			try:
+				response = get(
+					"http://127.0.0.1:33863/airsend/close",
+					headers=headers,
+					timeout=6,
+				)
+				if response.status_code == 200:
+					ret = True
+			except exceptions.RequestException:
+				Domoticz.Error("Error closing listening: error code: "+response.status_code);
+				pass
+		return ret
 
-	def transfer(self, pid, addr, note) -> bool:
+	def commandState(self, pid, addr, command, callback=None):
+		self.transfer(pid, addr, {"method":"PUT","type":"STATE","value":command}, self._callbackAddr, callback)
+
+	def commandLevel(self, pid, addr, command, callback=None):
+		self.transfer(pid, addr, {"method":"PUT","type":"LEVEL","value":command}, self._callbackAddr, callback)
+
+	def transfer(self, pid, addr, note, callbackAddr=None, callback=None) -> bool:
 		"""Send a command."""
 		status_code = 404
-		ret = False
 
 		#uid = hashlib.sha256(entity_id.encode('utf-8')).hexdigest()[:12]
 		jnote = json.dumps(note)
+		callbackStr = ""
+		if callbackAddr:
+			callbackStr='"callback": "'+callbackAddr+'", '
 		
 		payload = (
-			'{"wait": 0, "channel":{ "id":'
+			'{"wait": 0, '+callbackStr+'"channel":{ "id":'
 			+ str(pid) +', "source\":'+str(addr)
-			+ '}, "thingnotes":{"uid":"12345", "notes":['
+			+ '}, "thingnotes":{"uid":"' + str(self._transferId) + '", "notes":['
 			+ jnote
 			+ "]}}"
 		)
+		if callback:
+			self._requestCallbacks[self._transferId]=callback
+		self._transferId+=1
 		headers = {
 			"Authorization": "Bearer " + self._spurl,
 			"content-type": "application/json",
 			"User-Agent": "domo_airsend",
 		}
 		try:
-			response = post("http://"+
-				self._serviceurl + "/airsend/transfer",
+			response = post(
+				"http://127.0.0.1:33863/airsend/transfer",
 				headers=headers,
 				data=payload,
 				timeout=6,
@@ -182,9 +259,9 @@ class BasePlugin:
 		except exceptions.RequestException:
 			pass
 		if status_code == 200:
-			return ret
-		Domoticz.Error("Transfer error "+"http://"+self._serviceurl + "/airsend/transfer: error code="+ str(status_code)+", "+payload)
-		return ret
+			return True
+		Domoticz.Error("Transfer error on http://127.0.0.1:33863/airsend/transfer, "+payload+", error code="+ str(status_code))
+		return False
 
 global _plugin
 _plugin = BasePlugin()
@@ -192,6 +269,10 @@ _plugin = BasePlugin()
 def onStart():
 	global _plugin
 	_plugin.onStart()
+
+def onStop():
+	global _plugin
+	_plugin.onStop()
 
 def onCommand(Unit, Command, Level, Color):
 	global _plugin
@@ -204,6 +285,18 @@ def onDeviceAdded(Unit):
 def onDeviceModified(Unit):
 	global _plugin
 	_plugin.onDeviceModified(Unit)
+
+def onConnect(Connection, Status, Description):
+	global _plugin
+	_plugin.onConnect(Connection, Status, Description)
+
+def onMessage(Connection, Data):
+	global _plugin
+	_plugin.onMessage(Connection, Data)
+
+def onDisconnect(Connection):
+	global _plugin
+	_plugin.onDisconnect(Connection)
 
 def DumpConfigToLog():
 	for x in Parameters:
