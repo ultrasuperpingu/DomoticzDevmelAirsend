@@ -106,7 +106,7 @@ class BasePlugin:
 			opt=int(fields[2])
 		
 		if opt:
-			self.commandState(pid, addr, opt)
+			self.commandData(pid, addr, opt)
 		elif Command == "Open":
 			self.commandState(pid, addr, "UP", lambda: device.Update(nValue=1, sValue = str("100")))
 		elif Command == "Stop":
@@ -215,6 +215,9 @@ class BasePlugin:
 				Domoticz.Error("Error closing listening: error code: "+response.status_code);
 				pass
 		return ret
+
+	def commandData(self, pid, addr, command, callback=None):
+		self.transfer(pid, addr, {"method":"PUT","type":"DATA","value":command}, self._callbackAddr, callback)
 
 	def commandState(self, pid, addr, command, callback=None):
 		self.transfer(pid, addr, {"method":"PUT","type":"STATE","value":command}, self._callbackAddr, callback)
