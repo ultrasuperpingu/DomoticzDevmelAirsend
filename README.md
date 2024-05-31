@@ -1,3 +1,5 @@
+Other Languages: [Français](README.fr.md)
+
 # DomoticzDevmelAirsend
 Devmel Airsend Plugin for Domoticz
 
