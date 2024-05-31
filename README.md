@@ -6,7 +6,7 @@ Devmel Airsend Plugin for Domoticz
 Your Domoticz has to be compiled with python support and python3 have to be installed.
 
 ### Airsend Webserver
-The Airsend Webserver as to be installed and running on the same machine than Domoticz.
+The Airsend Webserver has to be installed and running on the same machine than Domoticz.
 The Airsend Webserver can be found here: http://devmel.com/dl/AirSendWebService.tgz
 
 You can make an airsend service.
