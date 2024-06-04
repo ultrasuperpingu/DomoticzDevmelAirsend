@@ -106,7 +106,7 @@ class BasePlugin:
 				TypeCfg=BlindCfg
 			elif typ=="4099":
 				TypeCfg=BlindPositionCfg
-			CreateDeviceIfNeeded(name, pid+"_"+addr+"_"+str(opt), TypeCfg)
+			CreateDeviceIfNeeded(name, str(pid)+"_"+str(addr)+"_"+str(opt), TypeCfg)
 		Domoticz.Status("Asking for callback to the WebService...")
 		self.bind(callbackAddr=self._callbackAddr)
 		Domoticz.Status("Started...")
@@ -192,9 +192,9 @@ class BasePlugin:
 								if note['type'] == 2: #Temperature
 									temp=round(note['value']-273.10,1) #should be 273.15 but it does not match what the sensor is sending
 								elif note['type'] == 3: #Illumination
-									hum=float(note['value'])
-								elif note['type'] == 4: #Humidity
 									ill=float(note['value'])
+								elif note['type'] == 4: #Humidity
+									hum=float(note['value'])
 							elif note['method'] == 1: #Put
 								if note['type'] == 0: #State
 									if note['value'] == 35: #Up
