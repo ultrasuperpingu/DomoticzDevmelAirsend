@@ -223,7 +223,7 @@ class BasePlugin:
 								dev.Update(nValue=0, sValue=str(hum))
 						if ill != None:
 							dev=CreateDeviceIfNeeded("Lux",str(channel['id'])+"_"+str(channel['source'])+"_None", IllumCfg)
-							dev.Update(nValue=hum, sValue=str(hum))
+							dev.Update(nValue=ill, sValue=str(ill))
 						#Checking if it's remote binding
 						remoteMap=[remote for remote in self._remotesMapping if remote['pid'] == channel['id'] and remote['remoteAddr'] == channel['source']]
 						if receivedCommand != None and len(remoteMap) > 0:
