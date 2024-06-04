@@ -59,3 +59,12 @@ sudo pip3 install requests
     ]
 }
 ```
+ * Remote Mapping Config: A JSON which bind blind remotes to Domoticz blinds.
+				For example:
+```json
+{
+    "remotes":[
+        {"remoteAddr":1111111, "pid":13920, "blindAddr":1234567},
+        {"remoteAddr":2222222, "pid":26848, "blindAddr":7654321}
+    ]
+}

@@ -3,14 +3,14 @@ Plugin Devmel Airsend pour Domoticz
 
 ## Prerequisites
 ### Python 3
-Votre version de Domoticz doit avoir été compilé avec le support python et python3 doit être installé.
+Votre version de Domoticz doit avoir été compilée avec le support python et python3 doit être installé.
 
 ### Airsend Webserver
 Airsend Webserver doit être installé et démarré sur la même machine que Domoticz.
-Airsend Webserver: http://devmel.com/dl/AirSendWebService.tgz
+Vous pouvez télécharger le Airsend Webserver à cette adresse: http://devmel.com/dl/AirSendWebService.tgz
 
-Vous pouvez faire du Airsend Webserver un service.
-Voici un exemple de fichier service:
+Vous pouvez également faire du Airsend Webserver un service.
+Voici un exemple de fichier service (vous pouvez l'appeler par exemple airsend.service) :
 
 ```ini
 [Unit]
@@ -28,13 +28,14 @@ Voici un exemple de fichier service:
 [Install]
        WantedBy=multi-user.target
 ```
-Modifier en fonction de vos besoins (adaptez la version lancée en fonction de votre architecture, adaptez l'utilisateur et le group, etc), copier ce fichier dans /etc/systemd/system. Vous pouvez ensuite installer le service avec la commande:
+Modifier le en fonction de vos besoins (adapter la version lancée en fonction de votre architecture, adapter l'utilisateur et le groupe, etc), copier ce fichier dans /etc/systemd/system.
+Pour installer le service, utiliser la commande:
 ```bash
 systemctl enable airsend
 ```
-Penser ensuite a le démarrer (ou a rebooter la machine)
+Penser ensuite à le démarrer (ou à rebooter la machine)
 
-Pour utiliser le webserver via un container, vous trouverez de la documentation pou utiliser Docker su les forums Home Assitant par exemple.
+Pour utiliser le webserver via un container, vous trouverez de la documentation pour utiliser Docker sur les forums Home Assitant par exemple.
 
 ### Dépendances Python
 Le plugin utilise le package python requests. Pour l'installer:
@@ -58,3 +59,12 @@ sudo pip3 install requests
     ]
 }
 ```
+ * Remote Mapping Config: Un bout de JSON permettant de lie une télécommande physique à un dispositif de type 'Blind' (Volet roulant) sous Domoticz.
+				For example:
+```json
+{
+    "remotes":[
+        {"remoteAddr":1111111, "pid":13920, "blindAddr":1234567},
+        {"remoteAddr":2222222, "pid":26848, "blindAddr":7654321}
+    ]
+}
