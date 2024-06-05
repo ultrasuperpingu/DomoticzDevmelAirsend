@@ -213,7 +213,7 @@ class BasePlugin:
 										receivedCommand=(1,"1")
 						if temp != None and hum != None:
 							dev=CreateDeviceIfNeeded("Temp+Hum",str(channel['id'])+"_"+str(channel['source'])+"_None", TempHumCfg)
-							dev.Update(nValue=0, sValue=str(temp+";"+hum))
+							dev.Update(nValue=0, sValue=str(temp)+";"+str(hum))
 						else:
 							if temp != None:
 								dev=CreateDeviceIfNeeded("Temp",str(channel['id'])+"_"+str(channel['source'])+"_None", TempCfg)
